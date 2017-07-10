@@ -26,4 +26,4 @@ we demonstrate that influence functions are useful for multiple purposes:
 understanding model behavior, debugging models, detecting dataset errors,
 and even creating visually-indistinguishable training-set attacks.
 
-If you have questions, please contact Pang Wei Koh <pangwei@cs.stanford.edu>.
+If you have questions, please contact Pang Wei Koh (<pangwei@cs.stanford.edu>).
