@@ -8,7 +8,13 @@ This code replicates the experiments from the following paper:
 >
 > International Conference on Machine Learning (ICML), 2017.
 
-We have a reproducible, executable version of these scripts on [Codalab](https://worksheets.codalab.org/worksheets/0x2b314dc3536b482dbba02783a24719fd/).
+We have a reproducible, executable, and Dockerized version of these scripts on [Codalab](https://worksheets.codalab.org/worksheets/0x2b314dc3536b482dbba02783a24719fd/).
+
+Dependencies:
+- Numpy/Scipy/Scikit-learn/Pandas
+- Tensorflow/Keras
+- Spacy
+- Matplotlib/Seaborn (for visualizations)
 
 ---
 
