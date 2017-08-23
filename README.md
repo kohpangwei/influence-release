@@ -10,11 +10,17 @@ This code replicates the experiments from the following paper:
 
 We have a reproducible, executable, and Dockerized version of these scripts on [Codalab](https://worksheets.codalab.org/worksheets/0x2b314dc3536b482dbba02783a24719fd/).
 
+The datasets for the experiments can also be found at the Codalab link.
+
 Dependencies:
 - Numpy/Scipy/Scikit-learn/Pandas
-- Tensorflow/Keras
-- Spacy
+- Tensorflow (tested on v1.1.0)
+- Keras (tested on v2.0.4)
+- Spacy (tested on v1.8.2)
+- h5py (tested on v2.7.0)
 - Matplotlib/Seaborn (for visualizations)
+
+A Dockerfile with these dependencies can be found here: https://hub.docker.com/r/pangwei/tf1.1/
 
 ---
 
