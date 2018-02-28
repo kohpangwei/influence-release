@@ -691,7 +691,6 @@ class GenericNeuralNet(object):
                 single_train_feed_dict = self.fill_feed_dict_manual(X[counter, :], [Y[counter]])      
                 train_grad_loss_val = self.sess.run(self.grad_total_loss_op, feed_dict=single_train_feed_dict)
                 predicted_loss_diffs[counter] = np.dot(np.concatenate(inverse_hvp), np.concatenate(train_grad_loss_val)) / self.num_train_examples            
-
         else:
             if type(train_idx[0]) is np.int64:
                 unique_idxs = list(set(train_idx))
@@ -707,7 +706,7 @@ class GenericNeuralNet(object):
             predicted_loss_diffs = np.zeros([num_to_remove])
             for counter, idx_to_remove in enumerate(train_idx):
                 idx_list = [idx_to_remove] if type(idx_to_remove) is np.int64 else list(idx_to_remove)
-                predicted_loss_diffs[counter] = sum(single_predicted_loss[idx] for idx in idx_to_remove)
+                predicted_loss_diffs[counter] = sum(single_predicted_loss[idx] for idx in idx_list)
 
         duration = time.time() - start_time
         print('Multiplying by %s train examples took %s sec' % (num_to_remove, duration))

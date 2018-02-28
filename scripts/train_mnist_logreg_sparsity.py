@@ -20,19 +20,22 @@ import sys
 data_sets = load_small_mnist('data')
 
 num_classes = 10
-remove_multiplicity = 5
-
-if len(sys.argv) > 1:
-    remove_multiplicity = int(sys.argv[1])
+remove_multiplicity = 2
 
 input_dim = data_sets.train.x.shape[1]
 weight_decay = 0.01
 batch_size = 1400
-initial_learning_rate = 0.001 
+initial_learning_rate = 0.001
 keep_probs = None
 max_lbfgs_iter = 1000
 decay_epochs = [1000, 10000]
-num_to_remove = 500
+num_to_remove = 1
+remove_type = 'random'
+
+if len(sys.argv) > 1:
+    remove_multiplicity = int(sys.argv[1])
+if len(sys.argv) > 2:
+    remove_type = sys.argv[2]
 
 tf.reset_default_graph()
 
@@ -60,10 +63,9 @@ actual_loss_diffs, predicted_loss_diffs_cg, indices_to_remove = experiments.test
     iter_to_load=0,
     force_refresh=False,
     num_to_remove=num_to_remove,
-    remove_type='random',
+    remove_type=remove_type,
     remove_multiplicity=remove_multiplicity,
     random_seed=0)
-
 
 # LiSSA
 np.random.seed(17)
@@ -76,7 +78,7 @@ predicted_loss_diffs_lissa = tf_model.get_influence_on_test_loss(
 )
 
 np.savez(
-    'output/mnist_logreg_lbfgs_sparsity_retraining-{}-{}.npz'.format(remove_multiplicity, num_to_remove), 
+    'output/mnist_logreg_lbfgs_sparsity_retraining-{}-{}-{}.npz'.format(remove_multiplicity, num_to_remove, remove_type), 
     actual_loss_diffs=actual_loss_diffs, 
     predicted_loss_diffs_cg=predicted_loss_diffs_cg,
     predicted_loss_diffs_lissa=predicted_loss_diffs_lissa,

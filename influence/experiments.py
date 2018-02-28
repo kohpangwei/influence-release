@@ -92,7 +92,7 @@ def sample_random_combinations(n_population, k, size=1):
 
 def test_retraining(model, test_idx, iter_to_load, force_refresh=False, 
                     num_to_remove=50, num_steps=1000, random_seed=17,
-                    remove_type='random', remove_multiplicity=1):
+                    remove_type='random', remove_multiplicity=1, tail_percentile=10):
 
     np.random.seed(random_seed)
 
@@ -101,6 +101,12 @@ def test_retraining(model, test_idx, iter_to_load, force_refresh=False,
 
     y_test = model.data_sets.test.labels[test_idx]
     print('Test label: %s' % y_test)
+
+    if remove_multiplicity < 1:
+        raise ValueError("remove_multiplicity must always be >= 1")
+    elif remove_multiplicity > 1:
+        if remove_type not in ['random', 'tail_pos', 'tail_neg', 'tail']:
+            raise ValueError("Removing multiple points not supported with this remove_type")
 
     ## Or, randomly remove training examples
     if remove_type == 'random':
@@ -122,6 +128,37 @@ def test_retraining(model, test_idx, iter_to_load, force_refresh=False,
             force_refresh=force_refresh)
         indices_to_remove = np.argsort(np.abs(predicted_loss_diffs))[-num_to_remove:]
         predicted_loss_diffs = predicted_loss_diffs[indices_to_remove]
+    ## Or, remove randomly from the top percentile of positive-influence training examples
+    elif remove_type in ['tail_pos', 'tail_neg', 'tail']:
+        # Sanity check
+        remove_pool_size = int(model.num_train_examples * tail_percentile / 100)
+        print(model.num_train_examples)
+        if remove_multiplicity == 1 and remove_pool_size < num_to_remove:
+            raise ValueError("Tail is not big enough to have this many trials")
+        if remove_multiplicity > 1 and remove_pool_size < remove_multiplicity:
+            raise ValueError("Tail is not big enough to remove this many examples")
+
+        predicted_loss_diffs = model.get_influence_on_test_loss(
+            [test_idx],
+            np.arange(len(model.data_sets.train.labels)),
+            force_refresh=force_refresh)
+        if remove_type == 'tail_pos':
+            sorted_indices = np.argsort(predicted_loss_diffs)
+        elif remove_type == 'tail_neg':
+            sorted_indices = np.argsort(-predicted_loss_diffs)
+        elif remove_type == 'tail':
+            sorted_indices = np.argsort(np.abs(predicted_loss_diffs))
+        remove_pool = sorted_indices[-remove_pool_size:]
+
+        if remove_multiplicity == 1:
+            indices_to_remove = np.random.choice(remove_pool, size=num_to_remove, replace=False)
+        else:
+            indices_to_remove = sample_random_combinations(remove_pool, remove_multiplicity, size=num_to_remove)
+
+        predicted_loss_diffs = model.get_influence_on_test_loss(
+            [test_idx],
+            indices_to_remove,
+            force_refresh=force_refresh)
     else:
         raise ValueError('remove_type not well specified')
     actual_loss_diffs = np.zeros([num_to_remove])
@@ -159,8 +196,13 @@ def test_retraining(model, test_idx, iter_to_load, force_refresh=False,
         if type(idx_to_remove) is np.int64:
             print('Retraining without train_idx %s (label %s):' % (idx_to_remove, model.data_sets.train.labels[idx_to_remove]))
         else:
-            print('Retraining without train_idxs %s (labels %s):' % (idx_to_remove,
-                [model.data_sets.train.labels[idx] for idx in idx_to_remove]))
+            if len(idx_to_remove) <= 3:
+                print('Retraining without train_idxs %s (labels %s):' % (idx_to_remove,
+                    [model.data_sets.train.labels[idx] for idx in idx_to_remove]))
+            else:
+                bit_of_idx = ", ".join(map(str, idx_to_remove[:3]))
+                bit_of_labels = ", ".join(map(str, [model.data_sets.train.labels[idx] for idx in idx_to_remove[:3]]))
+                print('Retraining without train_idxs (%s, ...) (labels [%s, ...]):' % (bit_of_idx, bit_of_labels))
 
         train_feed_dict = model.fill_feed_dict_with_all_but_some_ex(model.data_sets.train, idx_to_remove)
         model.retrain(num_steps=num_steps, feed_dict=train_feed_dict)
