@@ -29,7 +29,7 @@ initial_learning_rate = 0.001
 keep_probs = None
 max_lbfgs_iter = 1000
 decay_epochs = [1000, 10000]
-num_to_remove = 1
+num_to_remove = 500
 remove_type = 'random'
 
 if len(sys.argv) > 1:
