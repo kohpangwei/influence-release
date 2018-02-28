@@ -203,16 +203,18 @@ class GenericNeuralNet(object):
         return feed_dict
 
 
-    def fill_feed_dict_with_all_but_one_ex(self, data_set, idx_to_remove):
+    def fill_feed_dict_with_all_but_some_ex(self, data_set, idx_to_remove):
         num_examples = data_set.x.shape[0]
         idx = np.array([True] * num_examples, dtype=bool)
-        idx[idx_to_remove] = False
+        if type(idx_to_remove) is np.int64:
+            idx[idx_to_remove] = False
+        elif type(idx_to_remove) is tuple:
+            idx[list(idx_to_remove)] = False
         feed_dict = {
             self.input_placeholder: data_set.x[idx, :],
             self.labels_placeholder: data_set.labels[idx]
         }
         return feed_dict
-
 
     def fill_feed_dict_with_batch(self, data_set, batch_size=0):
         if batch_size is None:
@@ -614,7 +616,7 @@ class GenericNeuralNet(object):
         elif loss_type == 'adversarial_loss':
             op = self.grad_adversarial_loss_op
         else:
-            raise ValueError, 'Loss must be specified'
+            raise ValueError('Loss must be specified')
 
         if test_indices is not None:
             num_iter = int(np.ceil(len(test_indices) / batch_size))
@@ -650,10 +652,10 @@ class GenericNeuralNet(object):
         # because mini-batching permutes dataset order
 
         if train_idx is None: 
-            if (X is None) or (Y is None): raise ValueError, 'X and Y must be specified if using phantom points.'
-            if X.shape[0] != len(Y): raise ValueError, 'X and Y must have the same length.'
+            if (X is None) or (Y is None): raise ValueError('X and Y must be specified if using phantom points.')
+            if X.shape[0] != len(Y): raise ValueError('X and Y must have the same length.')
         else:
-            if (X is not None) or (Y is not None): raise ValueError, 'X and Y cannot be specified if train_idx is specified.'
+            if (X is not None) or (Y is not None): raise ValueError('X and Y cannot be specified if train_idx is specified.')
 
         test_grad_loss_no_reg_val = self.get_test_grad_loss_no_reg_val(test_indices, loss_type=loss_type)
 
@@ -690,14 +692,23 @@ class GenericNeuralNet(object):
                 train_grad_loss_val = self.sess.run(self.grad_total_loss_op, feed_dict=single_train_feed_dict)
                 predicted_loss_diffs[counter] = np.dot(np.concatenate(inverse_hvp), np.concatenate(train_grad_loss_val)) / self.num_train_examples            
 
-        else:            
+        else:
+            if type(train_idx[0]) is np.int64:
+                unique_idxs = list(set(train_idx))
+            else:
+                unique_idxs = list(set(sum(train_idx, ())))
+            single_predicted_loss = dict()
+            for idx in unique_idxs:
+                single_train_feed_dict = self.fill_feed_dict_with_one_ex(self.data_sets.train, idx)
+                train_grad_loss_val = self.sess.run(self.grad_total_loss_op, feed_dict=single_train_feed_dict)
+                single_predicted_loss[idx] = np.dot(np.concatenate(inverse_hvp), np.concatenate(train_grad_loss_val)) / self.num_train_examples
+
             num_to_remove = len(train_idx)
             predicted_loss_diffs = np.zeros([num_to_remove])
-            for counter, idx_to_remove in enumerate(train_idx):            
-                single_train_feed_dict = self.fill_feed_dict_with_one_ex(self.data_sets.train, idx_to_remove)      
-                train_grad_loss_val = self.sess.run(self.grad_total_loss_op, feed_dict=single_train_feed_dict)
-                predicted_loss_diffs[counter] = np.dot(np.concatenate(inverse_hvp), np.concatenate(train_grad_loss_val)) / self.num_train_examples
-                
+            for counter, idx_to_remove in enumerate(train_idx):
+                idx_list = [idx_to_remove] if type(idx_to_remove) is np.int64 else list(idx_to_remove)
+                predicted_loss_diffs[counter] = sum(single_predicted_loss[idx] for idx in idx_to_remove)
+
         duration = time.time() - start_time
         print('Multiplying by %s train examples took %s sec' % (num_to_remove, duration))
 

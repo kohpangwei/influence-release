@@ -35,7 +35,9 @@ class LogisticRegressionWithLBFGS(GenericNeuralNet):
 
         self.set_params_op = self.set_params()
         # self.hessians_op = hessians(self.total_loss, self.params)        
-        
+
+        self.max_lbfgs_iter = max_lbfgs_iter
+
         # Multinomial has weird behavior when it's binary
         C = 1.0 / (self.num_train_examples * self.weight_decay)        
         self.sklearn_model = linear_model.LogisticRegression(
@@ -45,18 +47,22 @@ class LogisticRegressionWithLBFGS(GenericNeuralNet):
             solver='lbfgs',
             multi_class='multinomial',
             warm_start=True, #True
-            max_iter=max_lbfgs_iter)
+            max_iter=self.max_lbfgs_iter)
 
-        C_minus_one = 1.0 / ((self.num_train_examples - 1) * self.weight_decay)
-        self.sklearn_model_minus_one = linear_model.LogisticRegression(
-            C=C_minus_one,
-            tol=1e-8,
-            fit_intercept=False, 
-            solver='lbfgs',
-            multi_class='multinomial',
-            warm_start=True, #True
-            max_iter=max_lbfgs_iter)        
+        self.sklearn_model_minus = dict()
 
+    def get_model_minus(self, k):
+        if k not in self.sklearn_model_minus:
+            C_minus_k = 1.0 / ((self.num_train_examples - k) * self.weight_decay)
+            self.sklearn_model_minus[k] = linear_model.LogisticRegression(
+                C=C_minus_k,
+                tol=1e-8,
+                fit_intercept=False, 
+                solver='lbfgs',
+                multi_class='multinomial',
+                warm_start=True, #True
+                max_iter=self.max_lbfgs_iter)
+        return self.sklearn_model_minus[k]
 
     def get_all_params(self):
         all_params = []
@@ -171,9 +177,13 @@ class LogisticRegressionWithLBFGS(GenericNeuralNet):
             model = self.sklearn_model
         elif num_train_examples == self.num_train_examples - 1:
             if verbose: print('Using model minus one')
-            model = self.sklearn_model_minus_one
+            model = self.get_model_minus(1)
+        elif num_train_examples < self.num_train_examples:
+            k = self.num_train_examples - num_train_examples
+            if verbose: print('Using model minus {}'.format(k))
+            model = self.get_model_minus(k)
         else:
-            raise ValueError, "feed_dict has incorrect number of training examples"
+            raise ValueError("feed_dict has incorrect number of training examples")
 
         # print(X_train)
         # print(Y_train)
