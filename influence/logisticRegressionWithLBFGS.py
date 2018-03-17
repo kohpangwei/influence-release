@@ -175,15 +175,10 @@ class LogisticRegressionWithLBFGS(GenericNeuralNet):
         if num_train_examples == self.num_train_examples:
             if verbose: print('Using normal model')
             model = self.sklearn_model
-        elif num_train_examples == self.num_train_examples - 1:
-            if verbose: print('Using model minus one')
-            model = self.get_model_minus(1)
-        elif num_train_examples < self.num_train_examples:
+        else:
             k = self.num_train_examples - num_train_examples
             if verbose: print('Using model minus {}'.format(k))
             model = self.get_model_minus(k)
-        else:
-            raise ValueError("feed_dict has incorrect number of training examples")
 
         # print(X_train)
         # print(Y_train)

@@ -32,6 +32,9 @@ class DataSet(object):
     def num_examples(self):
         return self._num_examples
 
+    def take(self, max_examples):
+        return DataSet(self._x[:max_examples], self._labels[:max_examples])
+
     def reset_batch(self):
         self._index_in_epoch = 0        
         self._x_batch = np.copy(self._x)
