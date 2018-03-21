@@ -254,22 +254,6 @@ def test_retraining_repeated(model, test_idx, repeat_idx=10, repeats=[1, 2, 4],
     all_train_feed_dict = model.fill_feed_dict_with_some_ex(model.data_sets.train, train_indices)
 
     model.retrain(num_steps=num_steps, feed_dict=all_train_feed_dict)
-    retrained_test_loss_val = sess.run(model.loss_no_reg, feed_dict=test_feed_dict)
-    retrained_train_loss_val = sess.run(model.total_loss, feed_dict=all_train_feed_dict)
-    # retrained_train_loss_val = model.minibatch_mean_eval([model.total_loss], model.data_sets.train)[0]
-
-    model.load_checkpoint(iter_to_load, do_checks=False)
-
-    print('Sanity check: what happens if you train the model a bit more?')
-    print('Loss on test idx with original model    : %s' % test_loss_val)
-    print('Loss on test idx with retrained model   : %s' % retrained_test_loss_val)
-    print('Difference in test loss after retraining     : %s' % (retrained_test_loss_val - test_loss_val))
-    print('===')
-    print('Total loss on training set with original model    : %s' % train_loss_val)
-    print('Total loss on training with retrained model   : %s' % retrained_train_loss_val)
-    print('Difference in train loss after retraining     : %s' % (retrained_train_loss_val - train_loss_val))
-
-    print('These differences should be close to 0.\n')
 
     # Retraining experiment
     actual_loss_diffs = np.zeros((len(repeats)))
