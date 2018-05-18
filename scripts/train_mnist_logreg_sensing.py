@@ -1,7 +1,7 @@
 from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
-from __future__ import unicode_literals  
+from __future__ import unicode_literals 
 
 import numpy as np
 import pandas as pd
@@ -16,11 +16,11 @@ from load_mnist import load_mnist, load_small_mnist
 
 import sys
 
-
 data_sets = load_small_mnist('data')
 
 num_classes = 10
-remove_multiplicity = 2
+remove_multiplicity = 100
+remove_type = "random"
 
 input_dim = data_sets.train.x.shape[1]
 weight_decay = 0.01
@@ -30,12 +30,11 @@ keep_probs = None
 max_lbfgs_iter = 1000
 decay_epochs = [1000, 10000]
 num_to_remove = 500
-remove_type = 'random'
 
 if len(sys.argv) > 1:
     remove_multiplicity = int(sys.argv[1])
 if len(sys.argv) > 2:
-    remove_type = sys.argv[2]
+    num_to_remove = int(sys.argv[2])
 
 tf.reset_default_graph()
 
@@ -52,12 +51,12 @@ tf_model = LogisticRegressionWithLBFGS(
     mini_batch=False,
     train_dir='output',
     log_dir='log',
-    model_name='mnist_logreg_lbfgs_sparsity')
+    model_name='mnist_logreg_sensing')
 
 tf_model.train()
 
 test_idx = 8
-actual_loss_diffs, predicted_loss_diffs_cg, indices_to_remove, _ = experiments.test_retraining(
+actual_loss_diffs, predicted_loss_diffs_cg, indices_to_remove, all_loss_diffs = experiments.test_retraining(
     tf_model,
     test_idx,
     iter_to_load=0,
@@ -67,20 +66,10 @@ actual_loss_diffs, predicted_loss_diffs_cg, indices_to_remove, _ = experiments.t
     remove_multiplicity=remove_multiplicity,
     random_seed=0)
 
-# LiSSA
-np.random.seed(17)
-predicted_loss_diffs_lissa = tf_model.get_influence_on_test_loss(
-    [test_idx], 
-    indices_to_remove,
-    approx_type='lissa',
-    approx_params={'scale':25, 'recursion_depth':5000, 'damping':0, 'batch_size':1, 'num_samples':10},
-    force_refresh=True
-)
-
 np.savez(
-    'output/mnist_logreg_lbfgs_sparsity_retraining-{}-{}-{}.npz'.format(remove_multiplicity, num_to_remove, remove_type), 
-    actual_loss_diffs=actual_loss_diffs, 
+    'output/mnist_logreg_sensing_{}_{}.npz'.format(remove_multiplicity, num_to_remove),
+    actual_loss_diffs=actual_loss_diffs,
     predicted_loss_diffs_cg=predicted_loss_diffs_cg,
-    predicted_loss_diffs_lissa=predicted_loss_diffs_lissa,
-    indices_to_remove=indices_to_remove
+    all_loss_diffs=all_loss_diffs,
+    indices_to_remove=indices_to_remove,
     )

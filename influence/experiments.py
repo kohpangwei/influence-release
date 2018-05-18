@@ -163,6 +163,12 @@ def test_retraining(model, test_idx, iter_to_load, force_refresh=False,
         raise ValueError('remove_type not well specified')
     actual_loss_diffs = np.zeros([num_to_remove])
 
+    # Get the influence of each individual train point
+    all_loss_diffs = model.get_influence_on_test_loss(
+        [test_idx], 
+        np.arange(len(model.data_sets.train.labels)),
+        force_refresh=force_refresh)
+
     # Sanity check
     test_feed_dict = model.fill_feed_dict_with_one_ex(
         model.data_sets.test,
@@ -225,7 +231,7 @@ def test_retraining(model, test_idx, iter_to_load, force_refresh=False,
         predicted_loss_diffs=predicted_loss_diffs)
 
     print('Correlation is %s' % pearsonr(actual_loss_diffs, predicted_loss_diffs)[0])
-    return actual_loss_diffs, predicted_loss_diffs, indices_to_remove
+    return actual_loss_diffs, predicted_loss_diffs, indices_to_remove, all_loss_diffs
 
 def test_retraining_repeated(model, test_idx, repeat_idx=10, repeats=[1, 2, 4],
                              train_subset=None,
