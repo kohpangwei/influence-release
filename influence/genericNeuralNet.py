@@ -203,16 +203,18 @@ class GenericNeuralNet(object):
         return feed_dict
 
 
-    def fill_feed_dict_with_all_but_one_ex(self, data_set, idx_to_remove):
+    def fill_feed_dict_with_all_but_some_ex(self, data_set, idx_to_remove):
         num_examples = data_set.x.shape[0]
         idx = np.array([True] * num_examples, dtype=bool)
-        idx[idx_to_remove] = False
+        if type(idx_to_remove) is np.int64:
+            idx[idx_to_remove] = False
+        elif type(idx_to_remove) is tuple:
+            idx[list(idx_to_remove)] = False
         feed_dict = {
             self.input_placeholder: data_set.x[idx, :],
             self.labels_placeholder: data_set.labels[idx]
         }
         return feed_dict
-
 
     def fill_feed_dict_with_batch(self, data_set, batch_size=0):
         if batch_size is None:
@@ -263,16 +265,16 @@ class GenericNeuralNet(object):
     def minibatch_mean_eval(self, ops, data_set):
 
         num_examples = data_set.num_examples
-        assert num_examples % self.batch_size == 0
-        num_iter = int(num_examples / self.batch_size)
+        num_iter = (num_examples + self.batch_size - 1) // self.batch_size
 
         self.reset_datasets()
 
         ret = []
         for i in xrange(num_iter):
-            feed_dict = self.fill_feed_dict_with_batch(data_set)
+            this_batch_size = min(self.batch_size, num_examples - self.batch_size * i)
+            feed_dict = self.fill_feed_dict_with_batch(data_set, batch_size=this_batch_size)
             ret_temp = self.sess.run(ops, feed_dict=feed_dict)
-            
+
             if len(ret)==0:
                 for b in ret_temp:
                     if isinstance(b, list):
@@ -285,7 +287,7 @@ class GenericNeuralNet(object):
                         ret[counter] = [a + (c / float(num_iter)) for (a, c) in zip(ret[counter], b)]
                     else:
                         ret[counter] += (b / float(num_iter))
-            
+
         return ret
 
 
@@ -296,7 +298,7 @@ class GenericNeuralNet(object):
             grad_loss_val, loss_no_reg_val, loss_val, train_acc_val = self.minibatch_mean_eval(
                 [self.grad_total_loss_op, self.loss_no_reg, self.total_loss, self.accuracy_op],
                 self.data_sets.train)
-            
+
             test_loss_val, test_acc_val = self.minibatch_mean_eval(
                 [self.loss_no_reg, self.accuracy_op],
                 self.data_sets.test)
@@ -328,8 +330,8 @@ class GenericNeuralNet(object):
 
 
     def update_learning_rate(self, step):
-        assert self.num_train_examples % self.batch_size == 0
-        num_steps_in_epoch = self.num_train_examples / self.batch_size
+        #assert self.num_train_examples % self.batch_size == 0
+        num_steps_in_epoch = (self.num_train_examples + self.batch_size - 1) // self.batch_size
         epoch = step // num_steps_in_epoch
 
         multiplier = 1
@@ -517,17 +519,18 @@ class GenericNeuralNet(object):
 
         num_examples = self.num_train_examples
         if self.mini_batch == True:
-            batch_size = 100
-            assert num_examples % batch_size == 0
+            batch_size = self.batch_size
+            #assert num_examples % batch_size == 0
         else:
             batch_size = self.num_train_examples
 
-        num_iter = int(num_examples / batch_size)
+        num_iter = (num_examples + batch_size - 1) // batch_size
 
         self.reset_datasets()
         hessian_vector_val = None
         for i in xrange(num_iter):
-            feed_dict = self.fill_feed_dict_with_batch(self.data_sets.train, batch_size=batch_size)
+            this_batch_size = min(batch_size, num_examples - batch_size * i)
+            feed_dict = self.fill_feed_dict_with_batch(self.data_sets.train, batch_size=this_batch_size)
             # Can optimize this
             feed_dict = self.update_feed_dict_with_v_placeholder(feed_dict, v)
             hessian_vector_val_temp = self.sess.run(self.hessian_vector, feed_dict=feed_dict)
@@ -614,7 +617,7 @@ class GenericNeuralNet(object):
         elif loss_type == 'adversarial_loss':
             op = self.grad_adversarial_loss_op
         else:
-            raise ValueError, 'Loss must be specified'
+            raise ValueError('Loss must be specified')
 
         if test_indices is not None:
             num_iter = int(np.ceil(len(test_indices) / batch_size))
@@ -650,10 +653,10 @@ class GenericNeuralNet(object):
         # because mini-batching permutes dataset order
 
         if train_idx is None: 
-            if (X is None) or (Y is None): raise ValueError, 'X and Y must be specified if using phantom points.'
-            if X.shape[0] != len(Y): raise ValueError, 'X and Y must have the same length.'
+            if (X is None) or (Y is None): raise ValueError('X and Y must be specified if using phantom points.')
+            if X.shape[0] != len(Y): raise ValueError('X and Y must have the same length.')
         else:
-            if (X is not None) or (Y is not None): raise ValueError, 'X and Y cannot be specified if train_idx is specified.'
+            if (X is not None) or (Y is not None): raise ValueError('X and Y cannot be specified if train_idx is specified.')
 
         test_grad_loss_no_reg_val = self.get_test_grad_loss_no_reg_val(test_indices, loss_type=loss_type)
 
@@ -689,15 +692,23 @@ class GenericNeuralNet(object):
                 single_train_feed_dict = self.fill_feed_dict_manual(X[counter, :], [Y[counter]])      
                 train_grad_loss_val = self.sess.run(self.grad_total_loss_op, feed_dict=single_train_feed_dict)
                 predicted_loss_diffs[counter] = np.dot(np.concatenate(inverse_hvp), np.concatenate(train_grad_loss_val)) / self.num_train_examples            
+        else:
+            if type(train_idx[0]) is np.int64:
+                unique_idxs = list(set(train_idx))
+            else:
+                unique_idxs = list(set(sum(train_idx, ())))
+            single_predicted_loss = dict()
+            for idx in unique_idxs:
+                single_train_feed_dict = self.fill_feed_dict_with_one_ex(self.data_sets.train, idx)
+                train_grad_loss_val = self.sess.run(self.grad_total_loss_op, feed_dict=single_train_feed_dict)
+                single_predicted_loss[idx] = np.dot(np.concatenate(inverse_hvp), np.concatenate(train_grad_loss_val)) / self.num_train_examples
 
-        else:            
             num_to_remove = len(train_idx)
             predicted_loss_diffs = np.zeros([num_to_remove])
-            for counter, idx_to_remove in enumerate(train_idx):            
-                single_train_feed_dict = self.fill_feed_dict_with_one_ex(self.data_sets.train, idx_to_remove)      
-                train_grad_loss_val = self.sess.run(self.grad_total_loss_op, feed_dict=single_train_feed_dict)
-                predicted_loss_diffs[counter] = np.dot(np.concatenate(inverse_hvp), np.concatenate(train_grad_loss_val)) / self.num_train_examples
-                
+            for counter, idx_to_remove in enumerate(train_idx):
+                idx_list = [idx_to_remove] if type(idx_to_remove) is np.int64 else list(idx_to_remove)
+                predicted_loss_diffs[counter] = sum(single_predicted_loss[idx] for idx in idx_list)
+
         duration = time.time() - start_time
         print('Multiplying by %s train examples took %s sec' % (num_to_remove, duration))
 
@@ -763,18 +774,18 @@ class GenericNeuralNet(object):
         test_grad_loss_no_reg_val = self.get_test_grad_loss_no_reg_val(test_indices, loss_type=loss_type)            
 
         if verbose: print('Norm of test gradient: %s' % np.linalg.norm(np.concatenate(test_grad_loss_no_reg_val)))
-        
+
         start_time = time.time()
 
         if test_description is None:
             test_description = test_indices
 
         approx_filename = os.path.join(self.train_dir, '%s-%s-%s-test-%s.npz' % (self.model_name, approx_type, loss_type, test_description))
-        
+
         if os.path.exists(approx_filename) and force_refresh == False:
             inverse_hvp = list(np.load(approx_filename)['inverse_hvp'])
             if verbose: print('Loaded inverse HVP from %s' % approx_filename)
-        else:            
+        else:
             inverse_hvp = self.get_inverse_hvp(
                 test_grad_loss_no_reg_val,
                 approx_type,
@@ -782,7 +793,7 @@ class GenericNeuralNet(object):
                 verbose=verbose)
             np.savez(approx_filename, inverse_hvp=inverse_hvp)
             if verbose: print('Saved inverse HVP to %s' % approx_filename)            
-        
+
         duration = time.time() - start_time
         if verbose: print('Inverse HVP took %s sec' % duration)
 
@@ -798,7 +809,7 @@ class GenericNeuralNet(object):
 
             # Run the grad op with the feed dict
             current_grad_influence_wrt_input_val = self.sess.run(self.grad_influence_wrt_input_op, feed_dict=grad_influence_feed_dict)[0][0, :]            
-            
+
             if grad_influence_wrt_input_val is None:
                 grad_influence_wrt_input_val = np.zeros([len(train_indices), len(current_grad_influence_wrt_input_val)])
 

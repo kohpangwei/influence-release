@@ -76,7 +76,7 @@ class All_CNN_C(GenericNeuralNet):
 
         retrain_dataset = DataSet(feed_dict[self.input_placeholder], feed_dict[self.labels_placeholder])
 
-        for step in xrange(num_steps):   
+        for step in range(num_steps):   
             iter_feed_dict = self.fill_feed_dict_with_batch(retrain_dataset)
             self.sess.run(self.train_op, feed_dict=iter_feed_dict)
 

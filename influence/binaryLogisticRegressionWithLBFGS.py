@@ -84,6 +84,9 @@ class BinaryLogisticRegressionWithLBFGS(LogisticRegressionWithLBFGS):
         ignore_hessian=False
         ):
 
+        if type(idx_to_remove) is not int and ignore_training_error:
+            raise ValueError('Multiple indices are not supported with ignore_training_error')
+
         test_grad_loss_no_reg_val = self.get_test_grad_loss_no_reg_val(test_indices, loss_type=loss_type)
 
         print('Norm of test gradient: %s' % np.linalg.norm(np.concatenate(test_grad_loss_no_reg_val)))
@@ -119,7 +122,7 @@ class BinaryLogisticRegressionWithLBFGS(LogisticRegressionWithLBFGS):
         for counter, idx_to_remove in enumerate(train_idx):            
             
             if ignore_training_error == False:
-                single_train_feed_dict = self.fill_feed_dict_with_one_ex(self.data_sets.train, idx_to_remove)      
+                single_train_feed_dict = self.fill_feed_dict_with_some_ex(self.data_sets.train, idx_to_remove)      
                 train_grad_loss_val = self.sess.run(self.grad_total_loss_op, feed_dict=single_train_feed_dict)
             else:
                 train_grad_loss_val = [-(self.data_sets.train.labels[idx_to_remove] * 2 - 1) * self.data_sets.train.x[idx_to_remove, :]]
