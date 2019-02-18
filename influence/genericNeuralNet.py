@@ -614,7 +614,7 @@ class GenericNeuralNet(object):
         elif loss_type == 'adversarial_loss':
             op = self.grad_adversarial_loss_op
         else:
-            raise ValueError, 'Loss must be specified'
+            raise ValueError('Loss must be specified')
 
         if test_indices is not None:
             num_iter = int(np.ceil(len(test_indices) / batch_size))
@@ -650,10 +650,10 @@ class GenericNeuralNet(object):
         # because mini-batching permutes dataset order
 
         if train_idx is None: 
-            if (X is None) or (Y is None): raise ValueError, 'X and Y must be specified if using phantom points.'
-            if X.shape[0] != len(Y): raise ValueError, 'X and Y must have the same length.'
+            if (X is None) or (Y is None): raise ValueError('X and Y must be specified if using phantom points.')
+            if X.shape[0] != len(Y): raise ValueError('X and Y must have the same length.')
         else:
-            if (X is not None) or (Y is not None): raise ValueError, 'X and Y cannot be specified if train_idx is specified.'
+            if (X is not None) or (Y is not None): raise ValueError('X and Y cannot be specified if train_idx is specified.')
 
         test_grad_loss_no_reg_val = self.get_test_grad_loss_no_reg_val(test_indices, loss_type=loss_type)
 
