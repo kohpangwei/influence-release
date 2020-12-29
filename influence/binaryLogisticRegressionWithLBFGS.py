@@ -1,7 +1,7 @@
 from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
-from __future__ import unicode_literals  
+from __future__ import unicode_literals
 
 import abc
 import sys
@@ -11,8 +11,8 @@ import pandas as pd
 from sklearn import linear_model, preprocessing, cluster
 import scipy.linalg as slin
 import scipy.sparse.linalg as sparselin
-import scipy.sparse as sparse 
-from scipy.special import expit 
+import scipy.sparse as sparse
+from scipy.special import expit
 
 import os.path
 import time
@@ -30,11 +30,11 @@ class BinaryLogisticRegressionWithLBFGS(LogisticRegressionWithLBFGS):
 
         super(BinaryLogisticRegressionWithLBFGS, self).__init__(**kwargs)
 
-        C = 1.0 / (self.num_train_examples * self.weight_decay)        
+        C = 1.0 / (self.num_train_examples * self.weight_decay)
         self.sklearn_model = linear_model.LogisticRegression(
             C=C,
             tol=1e-8,
-            fit_intercept=False, 
+            fit_intercept=False,
             solver='lbfgs',
             warm_start=True,
             max_iter=1000)
@@ -43,22 +43,22 @@ class BinaryLogisticRegressionWithLBFGS(LogisticRegressionWithLBFGS):
         self.sklearn_model_minus_one = linear_model.LogisticRegression(
             C=C_minus_one,
             tol=1e-8,
-            fit_intercept=False, 
+            fit_intercept=False,
             solver='lbfgs',
             warm_start=True,
-            max_iter=1000)        
+            max_iter=1000)
 
 
-    def inference(self, input):                
+    def inference(self, input):
         with tf.variable_scope('softmax_linear'):
             weights = variable_with_weight_decay(
-                'weights', 
+                'weights',
                 [self.input_dim],
                 stddev=1.0 / math.sqrt(float(self.input_dim)),
-                wd=self.weight_decay)            
+                wd=self.weight_decay)
 
             logits = tf.matmul(input, tf.reshape(weights, [self.input_dim, 1])) # + biases
-            zeros = tf.zeros_like(logits)            
+            zeros = tf.zeros_like(logits)
             logits_with_zeros = tf.concat([zeros, logits], 1)
 
         self.weights = weights
@@ -77,7 +77,7 @@ class BinaryLogisticRegressionWithLBFGS(LogisticRegressionWithLBFGS):
 
     # Special-purpose function for paper experiments
     # that has flags for ignoring training error or Hessian
-    def get_influence_on_test_loss(self, test_indices, train_idx, 
+    def get_influence_on_test_loss(self, test_indices, train_idx,
         approx_type='cg', approx_params=None, force_refresh=True, test_description=None,
         loss_type='normal_loss',
         ignore_training_error=False,
@@ -116,21 +116,21 @@ class BinaryLogisticRegressionWithLBFGS(LogisticRegressionWithLBFGS):
 
         num_to_remove = len(train_idx)
         predicted_loss_diffs = np.zeros([num_to_remove])
-        for counter, idx_to_remove in enumerate(train_idx):            
-            
+        for counter, idx_to_remove in enumerate(train_idx):
+
             if ignore_training_error == False:
-                single_train_feed_dict = self.fill_feed_dict_with_one_ex(self.data_sets.train, idx_to_remove)      
+                single_train_feed_dict = self.fill_feed_dict_with_one_ex(self.data_sets.train, idx_to_remove)
                 train_grad_loss_val = self.sess.run(self.grad_total_loss_op, feed_dict=single_train_feed_dict)
             else:
                 train_grad_loss_val = [-(self.data_sets.train.labels[idx_to_remove] * 2 - 1) * self.data_sets.train.x[idx_to_remove, :]]
             predicted_loss_diffs[counter] = np.dot(np.concatenate(inverse_hvp), np.concatenate(train_grad_loss_val)) / self.num_train_examples
-            
+
         duration = time.time() - start_time
         print('Multiplying by %s train examples took %s sec' % (num_to_remove, duration))
 
         return predicted_loss_diffs
 
- 
+
     def get_loo_influences(self):
 
         X_train = self.data_sets.train.x
@@ -138,15 +138,15 @@ class BinaryLogisticRegressionWithLBFGS(LogisticRegressionWithLBFGS):
         theta = self.sess.run(self.params)[0]
 
         # Pre-calculate inverse covariance matrix
-        n = X_train.shape[0]        
+        n = X_train.shape[0]
         dim = X_train.shape[1]
         cov = np.zeros([dim, dim])
 
         probs = expit(np.dot(X_train, theta.T))
         weighted_X_train = np.reshape(probs * (1 - probs), (-1, 1)) * X_train
 
-        cov = np.dot(X_train.T, weighted_X_train) / n 
-        cov += self.weight_decay * np.eye(dim)                    
+        cov = np.dot(X_train.T, weighted_X_train) / n
+        cov += self.weight_decay * np.eye(dim)
 
         cov_lu_factor = slin.lu_factor(cov)
 
@@ -154,10 +154,8 @@ class BinaryLogisticRegressionWithLBFGS(LogisticRegressionWithLBFGS):
         x_train_theta = np.reshape(X_train.dot(theta.T), [-1])
         sigma = expit(-Y_train * x_train_theta)
 
-        d_theta = slin.lu_solve(cov_lu_factor, X_train.T).T 
+        d_theta = slin.lu_solve(cov_lu_factor, X_train.T).T
 
         quad_x = np.sum(X_train * d_theta, axis=1)
 
-        return sigma * quad_x
-
-
+        return sigma**2 * quad_x
